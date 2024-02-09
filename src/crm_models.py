@@ -7,7 +7,30 @@ from skgstat import OrdinaryKriging, Variogram
 
 
 def calc_rate(times, dp, inj, tau, J, f, q0):
-    """CRM equation."""
+    """Compute production rate according to the CRM equation.
+
+    Parameters
+    ----------
+    times : torch tensor
+        Array of size (1, n_steps) with computation time steps.
+    dp : torch tensor
+        Array of size (n_wells, n_steps-1) with bottomhole differences for each production well.
+    inj : torch tensor
+        Array of size (1, n_steps) with total injection rate at each time step.
+    tau : torch tensor
+        Array of size (n_wells,) with ``tau`` parameter for each production well.
+    J : torch tensor
+        Array of size (n_wells,) with ``J`` parameter for each production well.
+    f : torch tensor
+        Array of size (n_wells,) with ``f`` parameter for each production well.
+    q0 : torch tensor
+        Array of size (n_wells,) with initial rate of for production well.
+
+    Returns
+    -------
+    rates : torch tensor
+        Array of size (n_wells, n_steps) with production rates.
+    """
     nexp = torch.exp(-times / tau)
     pexp = torch.exp(times / tau)
     rates = q0 * nexp
@@ -17,7 +40,27 @@ def calc_rate(times, dp, inj, tau, J, f, q0):
     return rates
 
 class CRM(nn.Module):#pylint:disable=too-many-instance-attributes
-    """Basic CRM model."""
+    """Basic CRM model.
+
+    Implements basic CRM model.
+
+    Paramerers
+    ----------
+    n : int
+        Number of production wells.
+    tau : float
+        Amplitude of initialized parameter ``tau``.
+    J : float
+        Amplitude of initialized parameter ``J``.
+    f : float
+        Amplitude of initialized parameter ``f``.
+    tau_min : float
+        Minimal value for ``tau`` parameter. Default 1e-3.
+    J_min : float
+        Minimal value for ``J`` parameter. Default 1e-3.
+    f_min : float
+        Minimal value for ``f`` parameter. Default 1e-3.
+    """
     def __init__(self, n=1, tau=1, J=1, f=1, tau_min=1e-3, J_min=1e-3, f_min=1e-3):
         super().__init__()
         self._J = nn.Parameter(J * (1 + 0.1*torch.randn(n, 1)))
@@ -84,7 +127,21 @@ class CRM(nn.Module):#pylint:disable=too-many-instance-attributes
         return calc_rate(times, dp, inj, self.tau(locs), self.J(locs), self.f(locs), q0)
 
 class SpatialCRM(nn.Module):
-    """Spatial CRM model."""
+    """Spatial CRM model.
+
+    Implements SpatialCRM model.
+
+    Paramerers
+    ----------
+    h : int
+        Number of neurons at hidden layer.
+    tau_min : float
+        Minimal value for ``tau`` parameter. Default 1e-3.
+    J_min : float
+        Minimal value for ``J`` parameter. Default 1e-3.
+    f_min : float
+        Minimal value for ``f`` parameter. Default 1e-3.
+    """
     def __init__(self, h=1, tau_min=1e-3, J_min=0, f_min=1e-3):
         super().__init__()
         self._J = nn.Sequential(nn.Linear(2, h),
